@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { dummyThreads } from "../api/dummyData";
 
 function ThreadList() {
@@ -7,9 +8,10 @@ function ThreadList() {
 
       <div className="space-y-4">
         {dummyThreads.map((thread) => (
-          <div
+          <Link
             key={thread.id}
-            className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+            to={`/threads/${thread.id}`}
+            className="block border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="flex justify-between items-start">
               <h2 className="text-lg font-semibold text-blue-700">
@@ -33,7 +35,7 @@ function ThreadList() {
               <span>{thread.viewCount} views</span>
               <span>by {thread.authorName}</span>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
