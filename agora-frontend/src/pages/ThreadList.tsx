@@ -5,6 +5,14 @@ function ThreadList() {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">Discussion Forum</h1>
+      <div className="flex justify-between items-center mb-4">
+        <Link
+        to="/create"
+        className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+  >
+    Ask a Question
+  </Link>
+</div>
 
       <div className="space-y-4">
         {dummyThreads.map((thread) => (
