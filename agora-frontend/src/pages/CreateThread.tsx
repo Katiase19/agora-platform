@@ -1,21 +1,25 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createThread } from "../api/forumApi";
 
 function CreateThread() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [courseTag, setCourseTag] = useState("");
   const navigate = useNavigate();
+  const [error, setError] = useState("");
 
-  function handleSubmit() {
-    if (title.trim() === "" || body.trim() === "") return;
+ function handleSubmit() {
+  if (title.trim() === "" || body.trim() === "") return;
 
-    console.log("Creating thread:", { title, body, courseTag });
-
-    // For now, just go back to the thread list after "submitting"
-    navigate("/");
-  }
-
+  createThread({ title, body, courseTag })
+    .then(() => {
+      navigate("/");
+    })
+    .catch(() => {
+      setError("Failed to create thread. Make sure you're logged in.");
+    });
+}
   return (
     <div className="max-w-2xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">Ask a Question</h1>
@@ -53,6 +57,8 @@ function CreateThread() {
             className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
         </div>
+        
+        {error && <p className="text-red-600 text-sm">{error}</p>}
 
         <button
           onClick={handleSubmit}

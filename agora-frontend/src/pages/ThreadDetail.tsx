@@ -39,6 +39,10 @@ function ThreadDetail() {
     );
   }
 
+  function refreshReplies() {
+    getRepliesForThread(threadId).then((data) => setReplies(data));
+}
+
   return (
     <div className="max-w-3xl mx-auto p-6">
       <Link to="/" className="text-blue-600 underline text-sm">
@@ -99,7 +103,7 @@ function ThreadDetail() {
         ))}
       </div>
 
-      <ReplyBox />
+      <ReplyBox threadId={threadId} onReplyAdded={refreshReplies} />
     </div>
   );
 }

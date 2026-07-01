@@ -17,3 +17,29 @@ export async function getRepliesForThread(id: number): Promise<ReplyResponse[]> 
   );
   return response.data;
 }
+interface CreateThreadRequest {
+  title: string;
+  body: string;
+  courseTag: string;
+}
+
+export async function createThread(
+  data: CreateThreadRequest
+): Promise<ThreadResponse> {
+  const response = await apiClient.post<ThreadResponse>("/forum/threads", data);
+  return response.data;
+}
+interface CreateReplyRequest {
+  body: string;
+}
+
+export async function createReply(
+  threadId: number,
+  data: CreateReplyRequest
+): Promise<ReplyResponse> {
+  const response = await apiClient.post<ReplyResponse>(
+    `/forum/threads/${threadId}/replies`,
+    data
+  );
+  return response.data;
+}
