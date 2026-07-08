@@ -30,6 +30,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/resources/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/forum/**").permitAll()
+                        .requestMatchers("/swagger-ui/**").permitAll()
+                        .requestMatchers("/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -40,4 +43,6 @@ public class SecurityConfig {
 
         return http.build();
     }
+
+
 }
