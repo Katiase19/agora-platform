@@ -26,37 +26,40 @@ function CreateThread() {
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Title</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. How does recursion work in Java?"
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
+  <label htmlFor="title" className="block text-sm font-medium mb-1">Title</label>
+  <input
+    id="title"
+    type="text"
+    value={title}
+    onChange={(e) => setTitle(e.target.value)}
+    placeholder="e.g. How does recursion work in Java?"
+    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+  />
+</div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Course Tag</label>
-          <input
-            type="text"
-            value={courseTag}
-            onChange={(e) => setCourseTag(e.target.value)}
-            placeholder="e.g. CS201"
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
+<div>
+  <label htmlFor="courseTag" className="block text-sm font-medium mb-1">Course Tag</label>
+  <input
+    id="courseTag"
+    type="text"
+    value={courseTag}
+    onChange={(e) => setCourseTag(e.target.value)}
+    placeholder="e.g. CS201"
+    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+  />
+</div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Details</label>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Describe your question in detail..."
-            rows={6}
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
+<div>
+  <label htmlFor="body" className="block text-sm font-medium mb-1">Details</label>
+  <textarea
+    id="body"
+    value={body}
+    onChange={(e) => setBody(e.target.value)}
+    placeholder="Describe your question in detail..."
+    rows={6}
+    className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+  />
+</div>
         
         {error && <p className="text-red-600 text-sm">{error}</p>}
 

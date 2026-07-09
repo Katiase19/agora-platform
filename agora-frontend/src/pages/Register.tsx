@@ -56,83 +56,71 @@ function Register() {
       <div className="space-y-4">
         <div className="flex gap-3">
           <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">
-              First Name <span className="text-red-500">*</span>
+            <label htmlFor="firstName" className="block text-sm font-medium mb-1">
+                First Name <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            <input id="firstName" type="text" value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
+
           </div>
 
           <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">
-              Last Name <span className="text-red-500">*</span>
+            <label htmlFor="lastName" className="block text-sm font-medium mb-1">
+                Last Name <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
+            <input id="lastName" type="text" value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+/>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label htmlFor="email" className="block text-sm font-medium mb-1">
             Email <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="email"
-            value={email}
+            </label>
+            <input id="email" type="email" value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+/>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label htmlFor="password" className="block text-sm font-medium mb-1">
             Password <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+        </label>
+        <input id="password" type="password" value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+/>
           <p className="text-xs text-gray-400 mt-1">Minimum 8 characters</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label htmlFor="courseOfStudy" className="block text-sm font-medium mb-1">
             Course of Study{" "}
             <span className="text-gray-400 font-normal">(optional)</span>
-          </label>
-          <input
-            type="text"
-            value={courseOfStudy}
+            </label>
+            <input id="courseOfStudy" type="text" value={courseOfStudy}
             onChange={(e) => setCourseOfStudy(e.target.value)}
             placeholder="e.g. Computer Science"
             className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+/>
+
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label htmlFor="academicYear" className="block text-sm font-medium mb-1">
             Academic Year{" "}
             <span className="text-gray-400 font-normal">(optional)</span>
-          </label>
-          <input
-            type="number"
-            value={academicYear}
+            </label>
+            <input id="academicYear" type="number" value={academicYear}
             onChange={(e) => setAcademicYear(e.target.value)}
-            placeholder="e.g. 2"
-            min={1}
-            max={6}
+            placeholder="e.g. 2" min={1} max={6}
             className="w-full border border-gray-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+/>
         </div>
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
