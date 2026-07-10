@@ -1,0 +1,1 @@
+web: java -jar target/agora-backend.jar
