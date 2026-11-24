@@ -1,6 +1,8 @@
 package agora_backend.dto.request;
 
 import agora_backend.entity.VoteTargetType;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,5 +22,7 @@ public class VoteRequest {
     private Long targetId;
 
     @NotNull(message = "Vote value is required")
+    @Min(value = -1, message = "Vote value must be 1 or -1")
+    @Max(value = 1, message = "Vote value must be 1 or -1")
     private Integer value;
 }

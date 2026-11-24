@@ -18,6 +18,10 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
 
     List<Resource> findByUploaderId(Long uploaderId);
 
+    List<Resource> findByUploaderIdOrderByCreatedAtDesc(Long uploaderId);
+
+    List<Resource> findAllByOrderByCreatedAtDesc();
+
     @Query("SELECT r FROM Resource r WHERE " +
             "LOWER(r.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(r.description) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

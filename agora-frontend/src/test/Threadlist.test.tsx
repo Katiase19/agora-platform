@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import ThreadList from "../pages/ThreadList";
@@ -27,12 +28,16 @@ vi.mock("../api/forumApi", () => ({
       isResolved: false,
       voteScore: 5,
       viewCount: 89,
-      replyCount: 1,
+      replyCount: 0,
       authorName: "Kwame Asante",
       authorId: 102,
       createdAt: "2026-06-22T14:30:00",
     },
   ]),
+}));
+
+vi.mock("../api/resourceApi", () => ({
+  getTrendingResources: vi.fn().mockResolvedValue([]),
 }));
 
 function renderThreadList() {
@@ -45,6 +50,12 @@ function renderThreadList() {
   );
 }
 
+async function waitForThreads() {
+  await waitFor(() => {
+    expect(screen.getByText("How does binary search work?")).toBeInTheDocument();
+  });
+}
+
 describe("ThreadList", () => {
   it("shows loading state initially", () => {
     renderThreadList();
@@ -53,22 +64,16 @@ describe("ThreadList", () => {
 
   it("renders thread titles after loading", async () => {
     renderThreadList();
-    await waitFor(() => {
-      expect(
-        screen.getByText("How does binary search work?")
-      ).toBeInTheDocument();
-    });
-    expect(
-      screen.getByText("Past questions for Database Systems?")
-    ).toBeInTheDocument();
+    await waitForThreads();
+    expect(screen.getByText("Past questions for Database Systems?")).toBeInTheDocument();
   });
 
-  it("renders course tags", async () => {
+  it("renders course tags on the threads", async () => {
     renderThreadList();
-    await waitFor(() => {
-      expect(screen.getByText("CS201")).toBeInTheDocument();
-    });
-    expect(screen.getByText("CS305")).toBeInTheDocument();
+    await waitForThreads();
+    const list = screen.getByRole("list");
+    expect(within(list).getByText("CS201")).toBeInTheDocument();
+    expect(within(list).getByText("CS305")).toBeInTheDocument();
   });
 
   it("shows resolved badge on resolved threads", async () => {
@@ -83,5 +88,48 @@ describe("ThreadList", () => {
     await waitFor(() => {
       expect(screen.getByText("by Ama Owusu")).toBeInTheDocument();
     });
+  });
+
+  it("filters threads by search text", async () => {
+    const user = userEvent.setup();
+    renderThreadList();
+    await waitForThreads();
+
+    await user.type(screen.getByLabelText("Search threads"), "database");
+
+    expect(screen.queryByText("How does binary search work?")).not.toBeInTheDocument();
+    expect(screen.getByText("Past questions for Database Systems?")).toBeInTheDocument();
+  });
+
+  it("filters threads by course", async () => {
+    const user = userEvent.setup();
+    renderThreadList();
+    await waitForThreads();
+
+    await user.click(screen.getByLabelText("Filter by course CS305"));
+
+    expect(screen.queryByText("How does binary search work?")).not.toBeInTheDocument();
+    expect(screen.getByText("Past questions for Database Systems?")).toBeInTheDocument();
+  });
+
+  it("shows only unanswered threads with the Unanswered filter", async () => {
+    const user = userEvent.setup();
+    renderThreadList();
+    await waitForThreads();
+
+    await user.click(screen.getByRole("button", { name: "Unanswered" }));
+
+    expect(screen.queryByText("How does binary search work?")).not.toBeInTheDocument();
+    expect(screen.getByText("Past questions for Database Systems?")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when nothing matches", async () => {
+    const user = userEvent.setup();
+    renderThreadList();
+    await waitForThreads();
+
+    await user.type(screen.getByLabelText("Search threads"), "quantum physics");
+
+    expect(screen.getByText("No questions match your search")).toBeInTheDocument();
   });
 });

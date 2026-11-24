@@ -3,6 +3,8 @@ package agora_backend.service;
 import agora_backend.dto.request.ResourceUploadRequest;
 import agora_backend.dto.response.ResourceResponse;
 import agora_backend.entity.Resource;
+import agora_backend.entity.Role;
+import agora_backend.exception.ApiException;
 import agora_backend.entity.User;
 import agora_backend.repository.ResourceRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,16 @@ public class ResourceService {
             MultipartFile file,
             User uploader
     ) {
+        if (file == null || file.isEmpty()) {
+            throw ApiException.badRequest("Please choose a file to upload");
+        }
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            throw ApiException.badRequest("Title is required");
+        }
+        if (request.getCourseCode() == null || request.getCourseCode().isBlank()) {
+            throw ApiException.badRequest("Course code is required");
+        }
+
         // Store the file on disk and get back its URL
         String fileUrl = fileStorageService.storeFile(file);
 
@@ -42,7 +54,7 @@ public class ResourceService {
                 .fileName(originalFileName)
                 .fileType(fileType)
                 .resourceType(request.getResourceType())
-                .courseCode(request.getCourseCode())
+                .courseCode(request.getCourseCode().trim().toUpperCase().replaceAll("\\s+", ""))
                 .courseName(request.getCourseName())
                 .year(request.getYear())
                 .semester(request.getSemester())
@@ -58,7 +70,7 @@ public class ResourceService {
     }
 
     public List<ResourceResponse> getAllResources() {
-        return resourceRepository.findAll()
+        return resourceRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -66,7 +78,7 @@ public class ResourceService {
 
     public ResourceResponse getResourceById(Long id) {
         Resource resource = resourceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Resource not found"));
+                .orElseThrow(() -> ApiException.notFound("Resource not found"));
 
         // Increment view count every time someone views the resource
         resource.setViewCount(resource.getViewCount() + 1);
@@ -89,6 +101,13 @@ public class ResourceService {
                 .collect(Collectors.toList());
     }
 
+    public List<ResourceResponse> getResourcesByUploader(Long uploaderId) {
+        return resourceRepository.findByUploaderIdOrderByCreatedAtDesc(uploaderId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     public List<ResourceResponse> getTrendingResources() {
         return resourceRepository.findTop10ByOrderByDownloadCountDesc()
                 .stream()
@@ -103,13 +122,14 @@ public class ResourceService {
                 .collect(Collectors.toList());
     }
 
-    public void deleteResource(Long id, Long requesterId) {
+    public void deleteResource(Long id, User requester) {
         Resource resource = resourceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Resource not found"));
+                .orElseThrow(() -> ApiException.notFound("Resource not found"));
 
-        // Only the uploader can delete their own resource
-        if (!resource.getUploader().getId().equals(requesterId)) {
-            throw new RuntimeException("You are not authorized to delete this resource");
+        // Only the uploader (or a moderator/admin) can delete a resource
+        boolean isModerator = requester.getRole() == Role.MODERATOR || requester.getRole() == Role.ADMIN;
+        if (!resource.getUploader().getId().equals(requester.getId()) && !isModerator) {
+            throw ApiException.forbidden("You are not authorized to delete this resource");
         }
 
         fileStorageService.deleteFile(resource.getFileUrl());
@@ -118,7 +138,7 @@ public class ResourceService {
 
     public String incrementDownloadCount(Long id) {
         Resource resource = resourceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Resource not found"));
+                .orElseThrow(() -> ApiException.notFound("Resource not found"));
 
         resource.setDownloadCount(resource.getDownloadCount() + 1);
         resourceRepository.save(resource);

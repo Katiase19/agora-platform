@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 import VoteButtons from "../components/VoteButtons";
 
 describe("VoteButtons", () => {
@@ -14,11 +15,27 @@ describe("VoteButtons", () => {
     expect(screen.getByLabelText("Downvote")).toBeInTheDocument();
   });
 
-  it("upvote button is clickable", async () => {
+  it("calls onVote with +1 and -1", async () => {
     const user = userEvent.setup();
-    render(<VoteButtons voteScore={3} />);
-    const upvoteButton = screen.getByLabelText("Upvote");
-    await user.click(upvoteButton);
-    
+    const onVote = vi.fn();
+    render(<VoteButtons voteScore={3} onVote={onVote} />);
+
+    await user.click(screen.getByLabelText("Upvote"));
+    await user.click(screen.getByLabelText("Downvote"));
+
+    expect(onVote).toHaveBeenNthCalledWith(1, 1);
+    expect(onVote).toHaveBeenNthCalledWith(2, -1);
+  });
+
+  it("is disabled without an onVote handler (e.g. logged out)", () => {
+    render(<VoteButtons voteScore={3} disabledReason="Log in to vote" />);
+    expect(screen.getByLabelText("Upvote")).toBeDisabled();
+    expect(screen.getByLabelText("Upvote")).toHaveAttribute("title", "Log in to vote");
+  });
+
+  it("marks the user's current vote as pressed", () => {
+    render(<VoteButtons voteScore={3} userVote={1} onVote={() => {}} />);
+    expect(screen.getByLabelText("Upvote")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Downvote")).toHaveAttribute("aria-pressed", "false");
   });
 });

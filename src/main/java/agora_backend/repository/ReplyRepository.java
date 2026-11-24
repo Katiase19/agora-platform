@@ -11,5 +11,9 @@ public interface ReplyRepository extends JpaRepository<Reply, Long> {
 
     List<Reply> findByThreadIdOrderByVoteScoreDesc(Long threadId);
 
+    List<Reply> findByThreadId(Long threadId);
+
     List<Reply> findByAuthorId(Long authorId);
+
+    long countByThreadId(Long threadId);
 }

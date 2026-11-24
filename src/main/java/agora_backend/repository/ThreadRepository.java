@@ -11,14 +11,22 @@ import java.util.List;
 @Repository
 public interface ThreadRepository extends JpaRepository<DiscussionThread, Long> {
 
-    List<DiscussionThread> findByCourseTag(String courseTag);
+    List<DiscussionThread> findAllByOrderByCreatedAtDesc();
 
-    List<DiscussionThread> findByAuthorId(Long authorId);
+    List<DiscussionThread> findByCourseTagIgnoreCaseOrderByCreatedAtDesc(String courseTag);
+
+    List<DiscussionThread> findByAuthorIdOrderByCreatedAtDesc(Long authorId);
 
     @Query("SELECT t FROM DiscussionThread t WHERE " +
             "LOWER(t.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(t.body) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+            "LOWER(t.body) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(t.courseTag) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "ORDER BY t.createdAt DESC")
     List<DiscussionThread> searchByKeyword(@Param("keyword") String keyword);
+
+    @Query("SELECT DISTINCT UPPER(t.courseTag) FROM DiscussionThread t " +
+            "WHERE t.courseTag IS NOT NULL AND t.courseTag <> '' ORDER BY UPPER(t.courseTag)")
+    List<String> findDistinctCourseTags();
 
     List<DiscussionThread> findTop20ByOrderByCreatedAtDesc();
 

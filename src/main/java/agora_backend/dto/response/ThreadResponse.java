@@ -24,4 +24,7 @@ public class ThreadResponse {
     private String authorName;
     private Long authorId;
     private LocalDateTime createdAt;
+
+    // The logged-in user's vote on this item: 1, -1 or 0 (null when not known)
+    private Integer userVote;
 }

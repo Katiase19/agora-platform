@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { vi } from "vitest";
 import Navbar from "../components/Navbar";
 import { AuthProvider } from "../api/AuthContext";
 

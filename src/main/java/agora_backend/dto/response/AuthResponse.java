@@ -12,6 +12,9 @@ import lombok.NoArgsConstructor;
 public class AuthResponse {
 
     private String token;
+    private UserResponse user;
+
+    // Kept at the top level for backwards compatibility with existing clients
     private String email;
     private String firstName;
     private String lastName;

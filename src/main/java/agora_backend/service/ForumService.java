@@ -5,19 +5,30 @@ import agora_backend.dto.request.CreateThreadRequest;
 import agora_backend.dto.request.VoteRequest;
 import agora_backend.dto.response.ReplyResponse;
 import agora_backend.dto.response.ThreadResponse;
+import agora_backend.dto.response.VoteResponse;
 import agora_backend.entity.*;
+import agora_backend.exception.ApiException;
 import agora_backend.repository.ReplyRepository;
 import agora_backend.repository.ThreadRepository;
 import agora_backend.repository.VoteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ForumService {
+
+    /** Reputation gained/lost per vote point on a user's thread or reply. */
+    private static final int REPUTATION_PER_VOTE = 5;
+    /** Reputation gained when a user's reply is accepted as the answer. */
+    private static final int REPUTATION_PER_ACCEPTED_ANSWER = 15;
 
     private final ThreadRepository threadRepository;
     private final ReplyRepository replyRepository;
@@ -27,9 +38,9 @@ public class ForumService {
 
     public ThreadResponse createThread(CreateThreadRequest request, User author) {
         DiscussionThread thread = DiscussionThread.builder()
-                .title(request.getTitle())
-                .body(request.getBody())
-                .courseTag(request.getCourseTag())
+                .title(request.getTitle().trim())
+                .body(request.getBody().trim())
+                .courseTag(normalizeCourseTag(request.getCourseTag()))
                 .author(author)
                 .isResolved(false)
                 .voteScore(0)
@@ -40,70 +51,99 @@ public class ForumService {
         return mapThreadToResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public List<ThreadResponse> getAllThreads() {
-        return threadRepository.findAll()
-                .stream()
-                .map(this::mapThreadToResponse)
-                .collect(Collectors.toList());
+        return mapThreads(threadRepository.findAllByOrderByCreatedAtDesc());
     }
 
-    public ThreadResponse getThreadById(Long id) {
-        DiscussionThread thread = threadRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Thread not found"));
+    public ThreadResponse getThreadById(Long id, User viewer) {
+        DiscussionThread thread = findThread(id);
 
         thread.setViewCount(thread.getViewCount() + 1);
         threadRepository.save(thread);
 
-        return mapThreadToResponse(thread);
+        ThreadResponse response = mapThreadToResponse(thread);
+        if (viewer != null) {
+            response.setUserVote(
+                    voteRepository.findByUserIdAndTargetTypeAndTargetId(viewer.getId(), VoteTargetType.THREAD, id)
+                            .map(Vote::getValue)
+                            .orElse(0)
+            );
+        }
+        return response;
     }
 
+    @Transactional(readOnly = true)
     public List<ThreadResponse> getThreadsByCourse(String courseTag) {
-        return threadRepository.findByCourseTag(courseTag)
-                .stream()
-                .map(this::mapThreadToResponse)
-                .collect(Collectors.toList());
+        return mapThreads(threadRepository.findByCourseTagIgnoreCaseOrderByCreatedAtDesc(courseTag));
     }
 
+    @Transactional(readOnly = true)
+    public List<ThreadResponse> getThreadsByAuthor(Long authorId) {
+        return mapThreads(threadRepository.findByAuthorIdOrderByCreatedAtDesc(authorId));
+    }
+
+    @Transactional(readOnly = true)
     public List<ThreadResponse> searchThreads(String keyword) {
-        return threadRepository.searchByKeyword(keyword)
-                .stream()
-                .map(this::mapThreadToResponse)
-                .collect(Collectors.toList());
+        if (keyword == null || keyword.isBlank()) {
+            return getAllThreads();
+        }
+        return mapThreads(threadRepository.searchByKeyword(keyword.trim()));
     }
 
+    @Transactional(readOnly = true)
     public List<ThreadResponse> getRecentThreads() {
-        return threadRepository.findTop20ByOrderByCreatedAtDesc()
-                .stream()
-                .map(this::mapThreadToResponse)
-                .collect(Collectors.toList());
+        return mapThreads(threadRepository.findTop20ByOrderByCreatedAtDesc());
     }
 
+    @Transactional(readOnly = true)
     public List<ThreadResponse> getTopThreads() {
-        return threadRepository.findTop20ByOrderByVoteScoreDesc()
-                .stream()
-                .map(this::mapThreadToResponse)
-                .collect(Collectors.toList());
+        return mapThreads(threadRepository.findTop20ByOrderByVoteScoreDesc());
     }
 
-    public void deleteThread(Long id, Long requesterId) {
-        DiscussionThread thread = threadRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Thread not found"));
+    @Transactional(readOnly = true)
+    public List<String> getCourseTags() {
+        return threadRepository.findDistinctCourseTags();
+    }
 
-        if (!thread.getAuthor().getId().equals(requesterId)) {
-            throw new RuntimeException("You are not authorized to delete this thread");
+    public ThreadResponse updateThread(Long id, CreateThreadRequest request, User requester) {
+        DiscussionThread thread = findThread(id);
+
+        if (!thread.getAuthor().getId().equals(requester.getId())) {
+            throw ApiException.forbidden("You can only edit your own threads");
         }
 
+        thread.setTitle(request.getTitle().trim());
+        thread.setBody(request.getBody().trim());
+        thread.setCourseTag(normalizeCourseTag(request.getCourseTag()));
+        return mapThreadToResponse(threadRepository.save(thread));
+    }
+
+    public void deleteThread(Long id, User requester) {
+        DiscussionThread thread = findThread(id);
+
+        if (!thread.getAuthor().getId().equals(requester.getId()) && !isModerator(requester)) {
+            throw ApiException.forbidden("You are not authorized to delete this thread");
+        }
+
+        // Remove replies and all votes first, otherwise the foreign keys block the delete
+        List<Reply> replies = replyRepository.findByThreadId(id);
+        List<Long> replyIds = replies.stream().map(Reply::getId).toList();
+        if (!replyIds.isEmpty()) {
+            voteRepository.deleteByTargetTypeAndTargetIdIn(VoteTargetType.REPLY, replyIds);
+            replyRepository.deleteAll(replies);
+        }
+        voteRepository.deleteByTargetTypeAndTargetIdIn(VoteTargetType.THREAD, List.of(id));
         threadRepository.delete(thread);
     }
 
     // ---------- REPLIES ----------
 
     public ReplyResponse createReply(Long threadId, CreateReplyRequest request, User author) {
-        DiscussionThread thread = threadRepository.findById(threadId)
-                .orElseThrow(() -> new RuntimeException("Thread not found"));
+        DiscussionThread thread = findThread(threadId);
 
         Reply reply = Reply.builder()
-                .body(request.getBody())
+                .body(request.getBody().trim())
                 .thread(thread)
                 .author(author)
                 .isAccepted(false)
@@ -111,29 +151,71 @@ public class ForumService {
                 .build();
 
         Reply saved = replyRepository.save(reply);
-        return mapReplyToResponse(saved);
+        ReplyResponse response = mapReplyToResponse(saved);
+        response.setUserVote(0);
+        return response;
     }
 
-    public List<ReplyResponse> getRepliesByThread(Long threadId) {
-        return replyRepository.findByThreadIdOrderByVoteScoreDesc(threadId)
-                .stream()
-                .map(this::mapReplyToResponse)
+    @Transactional(readOnly = true)
+    public List<ReplyResponse> getRepliesByThread(Long threadId, User viewer) {
+        List<Reply> replies = replyRepository.findByThreadIdOrderByVoteScoreDesc(threadId);
+
+        Map<Long, Integer> userVotes = Collections.emptyMap();
+        if (viewer != null && !replies.isEmpty()) {
+            List<Long> replyIds = replies.stream().map(Reply::getId).toList();
+            userVotes = voteRepository
+                    .findByUserIdAndTargetTypeAndTargetIdIn(viewer.getId(), VoteTargetType.REPLY, replyIds)
+                    .stream()
+                    .collect(Collectors.toMap(Vote::getTargetId, Vote::getValue));
+        }
+
+        final Map<Long, Integer> votes = userVotes;
+        return replies.stream()
+                // Accepted answer always first, then by votes
+                .sorted((a, b) -> Boolean.compare(b.getIsAccepted(), a.getIsAccepted()))
+                .map(reply -> {
+                    ReplyResponse response = mapReplyToResponse(reply);
+                    if (viewer != null) {
+                        response.setUserVote(votes.getOrDefault(reply.getId(), 0));
+                    }
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 
-    public ReplyResponse markAsAccepted(Long replyId, Long threadId, Long requesterId) {
-        DiscussionThread thread = threadRepository.findById(threadId)
-                .orElseThrow(() -> new RuntimeException("Thread not found"));
+    public ReplyResponse markAsAccepted(Long replyId, Long threadId, User requester) {
+        DiscussionThread thread = findThread(threadId);
 
         // Only the thread author can mark an accepted answer
-        if (!thread.getAuthor().getId().equals(requesterId)) {
-            throw new RuntimeException("Only the thread author can mark an accepted answer");
+        if (!thread.getAuthor().getId().equals(requester.getId())) {
+            throw ApiException.forbidden("Only the thread author can mark an accepted answer");
         }
 
-        Reply reply = replyRepository.findById(replyId)
-                .orElseThrow(() -> new RuntimeException("Reply not found"));
+        Reply reply = findReply(replyId);
+        if (!reply.getThread().getId().equals(threadId)) {
+            throw ApiException.badRequest("This reply does not belong to this thread");
+        }
+
+        // Toggle: accepting the already-accepted reply un-accepts it
+        if (Boolean.TRUE.equals(reply.getIsAccepted())) {
+            reply.setIsAccepted(false);
+            adjustReputation(reply.getAuthor(), requester, -REPUTATION_PER_ACCEPTED_ANSWER);
+            thread.setIsResolved(false);
+            threadRepository.save(thread);
+            return mapReplyToResponse(replyRepository.save(reply));
+        }
+
+        // Only one accepted answer per thread
+        for (Reply other : replyRepository.findByThreadId(threadId)) {
+            if (Boolean.TRUE.equals(other.getIsAccepted())) {
+                other.setIsAccepted(false);
+                adjustReputation(other.getAuthor(), requester, -REPUTATION_PER_ACCEPTED_ANSWER);
+                replyRepository.save(other);
+            }
+        }
 
         reply.setIsAccepted(true);
+        adjustReputation(reply.getAuthor(), requester, REPUTATION_PER_ACCEPTED_ANSWER);
         Reply saved = replyRepository.save(reply);
 
         thread.setIsResolved(true);
@@ -142,70 +224,144 @@ public class ForumService {
         return mapReplyToResponse(saved);
     }
 
-    public void deleteReply(Long id, Long requesterId) {
-        Reply reply = replyRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reply not found"));
+    public ReplyResponse updateReply(Long id, CreateReplyRequest request, User requester) {
+        Reply reply = findReply(id);
 
-        if (!reply.getAuthor().getId().equals(requesterId)) {
-            throw new RuntimeException("You are not authorized to delete this reply");
+        if (!reply.getAuthor().getId().equals(requester.getId())) {
+            throw ApiException.forbidden("You can only edit your own replies");
         }
 
+        reply.setBody(request.getBody().trim());
+        return mapReplyToResponse(replyRepository.save(reply));
+    }
+
+    public void deleteReply(Long id, User requester) {
+        Reply reply = findReply(id);
+
+        if (!reply.getAuthor().getId().equals(requester.getId()) && !isModerator(requester)) {
+            throw ApiException.forbidden("You are not authorized to delete this reply");
+        }
+
+        // If the accepted answer is deleted, the thread is no longer resolved
+        if (Boolean.TRUE.equals(reply.getIsAccepted())) {
+            DiscussionThread thread = reply.getThread();
+            thread.setIsResolved(false);
+            threadRepository.save(thread);
+        }
+
+        voteRepository.deleteByTargetTypeAndTargetIdIn(VoteTargetType.REPLY, List.of(id));
         replyRepository.delete(reply);
     }
 
     // ---------- VOTING ----------
 
-    public void castVote(VoteRequest request, User voter) {
+    public VoteResponse castVote(VoteRequest request, User voter) {
+        if (request.getValue() != 1 && request.getValue() != -1) {
+            throw ApiException.badRequest("Vote value must be 1 or -1");
+        }
+
+        User targetAuthor = request.getTargetType() == VoteTargetType.THREAD
+                ? findThread(request.getTargetId()).getAuthor()
+                : findReply(request.getTargetId()).getAuthor();
+
+        if (targetAuthor.getId().equals(voter.getId())) {
+            throw ApiException.badRequest("You cannot vote on your own post");
+        }
+
         var existingVote = voteRepository.findByUserIdAndTargetTypeAndTargetId(
                 voter.getId(), request.getTargetType(), request.getTargetId()
         );
 
+        int delta;
+        int userVote;
+
         if (existingVote.isPresent()) {
-            // User already voted - if same value, remove vote (toggle off)
-            if (existingVote.get().getValue().equals(request.getValue())) {
-                voteRepository.delete(existingVote.get());
-                adjustVoteScore(request.getTargetType(), request.getTargetId(), -request.getValue());
-                return;
+            Vote vote = existingVote.get();
+            if (vote.getValue().equals(request.getValue())) {
+                // Same vote again -> remove the vote (toggle off)
+                voteRepository.delete(vote);
+                delta = -request.getValue();
+                userVote = 0;
             } else {
                 // Switching vote (e.g. upvote to downvote)
-                int scoreDifference = request.getValue() - existingVote.get().getValue();
-                existingVote.get().setValue(request.getValue());
-                voteRepository.save(existingVote.get());
-                adjustVoteScore(request.getTargetType(), request.getTargetId(), scoreDifference);
-                return;
+                delta = request.getValue() - vote.getValue();
+                vote.setValue(request.getValue());
+                voteRepository.save(vote);
+                userVote = request.getValue();
             }
+        } else {
+            Vote vote = Vote.builder()
+                    .targetType(request.getTargetType())
+                    .targetId(request.getTargetId())
+                    .value(request.getValue())
+                    .user(voter)
+                    .build();
+            voteRepository.save(vote);
+            delta = request.getValue();
+            userVote = request.getValue();
         }
 
-        // New vote
-        Vote vote = Vote.builder()
+        int newScore = adjustVoteScore(request.getTargetType(), request.getTargetId(), delta);
+        adjustReputation(targetAuthor, voter, delta * REPUTATION_PER_VOTE);
+
+        return VoteResponse.builder()
                 .targetType(request.getTargetType())
                 .targetId(request.getTargetId())
-                .value(request.getValue())
-                .user(voter)
+                .voteScore(newScore)
+                .userVote(userVote)
                 .build();
-
-        voteRepository.save(vote);
-        adjustVoteScore(request.getTargetType(), request.getTargetId(), request.getValue());
     }
 
-    private void adjustVoteScore(VoteTargetType targetType, Long targetId, int delta) {
+    private int adjustVoteScore(VoteTargetType targetType, Long targetId, int delta) {
         if (targetType == VoteTargetType.THREAD) {
-            DiscussionThread thread = threadRepository.findById(targetId)
-                    .orElseThrow(() -> new RuntimeException("Thread not found"));
+            DiscussionThread thread = findThread(targetId);
             thread.setVoteScore(thread.getVoteScore() + delta);
-            threadRepository.save(thread);
+            return threadRepository.save(thread).getVoteScore();
         } else {
-            Reply reply = replyRepository.findById(targetId)
-                    .orElseThrow(() -> new RuntimeException("Reply not found"));
+            Reply reply = findReply(targetId);
             reply.setVoteScore(reply.getVoteScore() + delta);
-            replyRepository.save(reply);
+            return replyRepository.save(reply).getVoteScore();
         }
+    }
+
+    // ---------- HELPERS ----------
+
+    private DiscussionThread findThread(Long id) {
+        return threadRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Thread not found"));
+    }
+
+    private Reply findReply(Long id) {
+        return replyRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Reply not found"));
+    }
+
+    private boolean isModerator(User user) {
+        return user.getRole() == Role.MODERATOR || user.getRole() == Role.ADMIN;
+    }
+
+    /** Changes a user's reputation, ignoring changes a user would cause on themselves. */
+    private void adjustReputation(User user, User actor, int amount) {
+        if (amount == 0 || user.getId().equals(actor.getId())) return;
+        int current = user.getReputationScore() == null ? 0 : user.getReputationScore();
+        user.setReputationScore(current + amount);
+    }
+
+    private String normalizeCourseTag(String courseTag) {
+        if (courseTag == null || courseTag.isBlank()) return null;
+        return courseTag.trim().toUpperCase().replaceAll("\\s+", "");
     }
 
     // ---------- MAPPERS ----------
 
+    private List<ThreadResponse> mapThreads(List<DiscussionThread> threads) {
+        return threads.stream()
+                .map(this::mapThreadToResponse)
+                .collect(Collectors.toList());
+    }
+
     private ThreadResponse mapThreadToResponse(DiscussionThread thread) {
-        int replyCount = replyRepository.findByThreadIdOrderByVoteScoreDesc(thread.getId()).size();
+        int replyCount = (int) replyRepository.countByThreadId(thread.getId());
 
         return ThreadResponse.builder()
                 .id(thread.getId())

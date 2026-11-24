@@ -10,4 +10,4 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/agora-backend.jar app.jar
 EXPOSE 10000
-ENTRYPOINT ["java","-Dspring.profiles.activate=prod", "-jar", "app.jar"]
+ENTRYPOINT ["java","-Dspring.profiles.active=prod", "-jar", "app.jar"]

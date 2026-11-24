@@ -19,12 +19,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/resources")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class ResourceController {
 
     private final ResourceService resourceService;
 
-    @Operation(summary = "Upload a newstudey resource (lecture notes, past questions etc.)")
+    @Operation(summary = "Upload a new study resource (lecture notes, past questions etc.)")
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
     public ResponseEntity<ResourceResponse> uploadResource(
             @RequestParam("title") String title,
@@ -74,6 +73,12 @@ public class ResourceController {
         return ResponseEntity.ok(resourceService.getResourcesByCourse(courseCode));
     }
 
+    @Operation(summary = "Get all resources uploaded by a user")
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<ResourceResponse>> getResourcesByUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(resourceService.getResourcesByUploader(userId));
+    }
+
     @Operation(summary = "Get the top 10 most downloaded resources")
     @GetMapping("/trending")
     public ResponseEntity<List<ResourceResponse>> getTrendingResources() {
@@ -92,7 +97,7 @@ public class ResourceController {
             @PathVariable Long id,
             @AuthenticationPrincipal User requester
     ) {
-        resourceService.deleteResource(id, requester.getId());
+        resourceService.deleteResource(id, requester);
         return ResponseEntity.noContent().build();
     }
 
