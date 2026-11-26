@@ -27,4 +27,7 @@ public class ThreadResponse {
 
     // The logged-in user's vote on this item: 1, -1 or 0 (null when not known)
     private Integer userVote;
+
+    // Whether the logged-in user has bookmarked this thread (null when not logged in)
+    private Boolean bookmarked;
 }

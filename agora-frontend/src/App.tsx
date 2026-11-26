@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Resources from "./pages/Resources";
 import UploadResource from "./pages/UploadResource";
 import Profile from "./pages/Profile";
+import Saved from "./pages/Saved";
 import NotFound from "./pages/NotFound";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -32,6 +33,7 @@ function App() {
                 path="/resources/upload"
                 element={<ProtectedRoute><UploadResource /></ProtectedRoute>}
               />
+              <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />

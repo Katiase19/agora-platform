@@ -12,6 +12,8 @@ export interface ThreadResponse {
   createdAt: string;
   /** The logged-in user's vote: 1, -1 or 0. Null/absent when unknown. */
   userVote?: number | null;
+  /** Whether the logged-in user saved this thread. Null/absent when unknown. */
+  bookmarked?: boolean | null;
 }
 
 export interface ReplyResponse {
@@ -77,5 +79,18 @@ export interface ResourceResponse {
   viewCount: number;
   uploaderName: string;
   uploaderId: number;
+  createdAt: string;
+}
+
+export type NotificationType = "NEW_REPLY" | "BOOKMARKED_THREAD_REPLY" | "ANSWER_ACCEPTED" | "UPVOTE";
+
+export interface NotificationResponse {
+  id: number;
+  type: NotificationType;
+  /** Text that follows the actor's name, e.g. "replied to your question ..." */
+  message: string;
+  actorName: string | null;
+  threadId: number | null;
+  isRead: boolean;
   createdAt: string;
 }

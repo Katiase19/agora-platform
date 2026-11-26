@@ -8,6 +8,7 @@ import agora_backend.dto.response.ThreadResponse;
 import agora_backend.dto.response.VoteResponse;
 import agora_backend.entity.*;
 import agora_backend.exception.ApiException;
+import agora_backend.repository.BookmarkRepository;
 import agora_backend.repository.ReplyRepository;
 import agora_backend.repository.ThreadRepository;
 import agora_backend.repository.VoteRepository;
@@ -33,6 +34,8 @@ public class ForumService {
     private final ThreadRepository threadRepository;
     private final ReplyRepository replyRepository;
     private final VoteRepository voteRepository;
+    private final BookmarkRepository bookmarkRepository;
+    private final NotificationService notificationService;
 
     // ---------- THREADS ----------
 
@@ -69,6 +72,7 @@ public class ForumService {
                             .map(Vote::getValue)
                             .orElse(0)
             );
+            response.setBookmarked(bookmarkRepository.existsByUserIdAndThreadId(viewer.getId(), id));
         }
         return response;
     }
@@ -134,6 +138,8 @@ public class ForumService {
             replyRepository.deleteAll(replies);
         }
         voteRepository.deleteByTargetTypeAndTargetIdIn(VoteTargetType.THREAD, List.of(id));
+        bookmarkRepository.deleteByThreadId(id);
+        notificationService.deleteForThread(id);
         threadRepository.delete(thread);
     }
 
@@ -151,6 +157,8 @@ public class ForumService {
                 .build();
 
         Reply saved = replyRepository.save(reply);
+        notifyAboutReply(thread, author);
+
         ReplyResponse response = mapReplyToResponse(saved);
         response.setUserVote(0);
         return response;
@@ -217,6 +225,8 @@ public class ForumService {
         reply.setIsAccepted(true);
         adjustReputation(reply.getAuthor(), requester, REPUTATION_PER_ACCEPTED_ANSWER);
         Reply saved = replyRepository.save(reply);
+        notificationService.notify(reply.getAuthor(), requester, NotificationType.ANSWER_ACCEPTED,
+                "accepted your answer on " + NotificationService.quote(thread.getTitle()), threadId);
 
         thread.setIsResolved(true);
         threadRepository.save(thread);
@@ -260,8 +270,11 @@ public class ForumService {
             throw ApiException.badRequest("Vote value must be 1 or -1");
         }
 
+        DiscussionThread votedThread = request.getTargetType() == VoteTargetType.THREAD
+                ? findThread(request.getTargetId())
+                : findReply(request.getTargetId()).getThread();
         User targetAuthor = request.getTargetType() == VoteTargetType.THREAD
-                ? findThread(request.getTargetId()).getAuthor()
+                ? votedThread.getAuthor()
                 : findReply(request.getTargetId()).getAuthor();
 
         if (targetAuthor.getId().equals(voter.getId())) {
@@ -304,6 +317,14 @@ public class ForumService {
         int newScore = adjustVoteScore(request.getTargetType(), request.getTargetId(), delta);
         adjustReputation(targetAuthor, voter, delta * REPUTATION_PER_VOTE);
 
+        // Only a fresh thumbs up is worth a notification (not removals or thumbs down)
+        boolean newUpvote = userVote == 1 && existingVote.isEmpty();
+        if (newUpvote) {
+            String what = request.getTargetType() == VoteTargetType.THREAD ? "your question " : "your answer on ";
+            notificationService.notify(targetAuthor, voter, NotificationType.UPVOTE,
+                    "liked " + what + NotificationService.quote(votedThread.getTitle()), votedThread.getId());
+        }
+
         return VoteResponse.builder()
                 .targetType(request.getTargetType())
                 .targetId(request.getTargetId())
@@ -321,6 +342,49 @@ public class ForumService {
             Reply reply = findReply(targetId);
             reply.setVoteScore(reply.getVoteScore() + delta);
             return replyRepository.save(reply).getVoteScore();
+        }
+    }
+
+    // ---------- BOOKMARKS ----------
+
+    public void addBookmark(Long threadId, User user) {
+        DiscussionThread thread = findThread(threadId);
+        if (!bookmarkRepository.existsByUserIdAndThreadId(user.getId(), threadId)) {
+            bookmarkRepository.save(Bookmark.builder().user(user).thread(thread).build());
+        }
+    }
+
+    public void removeBookmark(Long threadId, User user) {
+        bookmarkRepository.findByUserIdAndThreadId(user.getId(), threadId)
+                .ifPresent(bookmarkRepository::delete);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ThreadResponse> getBookmarkedThreads(User user) {
+        return bookmarkRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(b -> {
+                    ThreadResponse response = mapThreadToResponse(b.getThread());
+                    response.setBookmarked(true);
+                    return response;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // ---------- NOTIFICATIONS ----------
+
+    /** Tells the thread author and everyone who bookmarked the thread about a new reply. */
+    private void notifyAboutReply(DiscussionThread thread, User replier) {
+        User threadAuthor = thread.getAuthor();
+        String title = NotificationService.quote(thread.getTitle());
+
+        notificationService.notify(threadAuthor, replier, NotificationType.NEW_REPLY,
+                "replied to your question " + title, thread.getId());
+
+        for (Bookmark bookmark : bookmarkRepository.findByThreadId(thread.getId())) {
+            User follower = bookmark.getUser();
+            if (follower.getId().equals(threadAuthor.getId())) continue; // already notified above
+            notificationService.notify(follower, replier, NotificationType.BOOKMARKED_THREAD_REPLY,
+                    "replied to a question you saved: " + title, thread.getId());
         }
     }
 

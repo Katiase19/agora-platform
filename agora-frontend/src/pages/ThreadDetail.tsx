@@ -17,6 +17,7 @@ import VoteButtons from "../components/VoteButtons";
 import ReplyBox from "../components/ReplyBox";
 import Avatar from "../components/Avatar";
 import RichText from "../components/RichText";
+import BookmarkButton from "../components/BookmarkButton";
 import { formatDate, pluralize, timeAgo } from "../utils/format";
 
 function ThreadDetail() {
@@ -197,6 +198,13 @@ function ThreadDetail() {
                 {copied ? <Check size={13} /> : <Link2 size={13} />}
                 {copied ? "Copied!" : "Share"}
               </button>
+              {token && (
+                <BookmarkButton
+                  threadId={thread.id}
+                  bookmarked={!!thread.bookmarked}
+                  onChange={(bookmarked) => setThread((t) => (t ? { ...t, bookmarked } : t))}
+                />
+              )}
               {isThreadAuthor && (
                 <Link
                   to={`/threads/${thread.id}/edit`}

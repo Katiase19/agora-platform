@@ -1,7 +1,8 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { MessagesSquare, BookOpen, Plus, LogOut, Award } from "lucide-react";
+import { MessagesSquare, BookOpen, Plus, LogOut, Award, Bookmark } from "lucide-react";
 import { useAuth } from "../api/AuthContext";
 import Avatar from "./Avatar";
+import NotificationBell from "./NotificationBell";
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
   return `inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
@@ -38,6 +39,12 @@ function Navbar() {
             <BookOpen size={16} />
             <span className="hidden sm:inline">Resources</span>
           </NavLink>
+          {token && (
+            <NavLink to="/saved" className={navLinkClass}>
+              <Bookmark size={16} />
+              <span className="hidden sm:inline">Saved</span>
+            </NavLink>
+          )}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
@@ -50,6 +57,7 @@ function Navbar() {
                 <Plus size={16} />
                 Ask a Question
               </Link>
+              <NotificationBell />
               {user && (
                 <Link
                   to="/profile"

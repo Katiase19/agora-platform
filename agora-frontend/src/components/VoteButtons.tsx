@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ThumbsUp, ThumbsDown } from "lucide-react";
 
 interface VoteButtonsProps {
   voteScore: number;
@@ -19,28 +19,29 @@ function VoteButtons({
   disabledReason,
 }: VoteButtonsProps) {
   const inactive = disabled || !onVote;
-  const title = inactive ? disabledReason : undefined;
+  const liked = userVote === 1;
+  const disliked = userVote === -1;
 
   return (
-    <div className="flex flex-col items-center gap-0.5 select-none">
+    <div className="flex flex-col items-center gap-1 select-none">
       <button
         type="button"
         onClick={() => onVote?.(1)}
         disabled={inactive}
-        title={title}
+        title={inactive ? disabledReason : liked ? "Remove thumbs up" : "Thumbs up"}
         aria-label="Upvote"
-        aria-pressed={userVote === 1}
-        className={`p-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-          userVote === 1
-            ? "text-white bg-emerald-500 hover:bg-emerald-600"
+        aria-pressed={liked}
+        className={`p-1.5 rounded-full transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-50 ${
+          liked
+            ? "text-emerald-600 bg-emerald-100 hover:bg-emerald-200"
             : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
         }`}
       >
-        <ChevronUp size={20} strokeWidth={2.5} />
+        <ThumbsUp size={18} strokeWidth={2} fill={liked ? "currentColor" : "none"} />
       </button>
       <span
         className={`text-sm font-bold tabular-nums ${
-          userVote === 1 ? "text-emerald-600" : userVote === -1 ? "text-rose-600" : "text-gray-700"
+          liked ? "text-emerald-600" : disliked ? "text-rose-600" : "text-gray-700"
         }`}
         aria-label={`Score ${voteScore}`}
       >
@@ -50,16 +51,16 @@ function VoteButtons({
         type="button"
         onClick={() => onVote?.(-1)}
         disabled={inactive}
-        title={title}
+        title={inactive ? disabledReason : disliked ? "Remove thumbs down" : "Thumbs down"}
         aria-label="Downvote"
-        aria-pressed={userVote === -1}
-        className={`p-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-          userVote === -1
-            ? "text-white bg-rose-500 hover:bg-rose-600"
+        aria-pressed={disliked}
+        className={`p-1.5 rounded-full transition-all active:scale-90 disabled:cursor-not-allowed disabled:opacity-50 ${
+          disliked
+            ? "text-rose-600 bg-rose-100 hover:bg-rose-200"
             : "text-gray-400 hover:text-rose-600 hover:bg-rose-50"
         }`}
       >
-        <ChevronDown size={20} strokeWidth={2.5} />
+        <ThumbsDown size={18} strokeWidth={2} fill={disliked ? "currentColor" : "none"} />
       </button>
     </div>
   );
